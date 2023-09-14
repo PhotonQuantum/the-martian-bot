@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO entities (url, chat_id, message_id)\nVALUES ($1, $2, $3)\nON CONFLICT (chat_id, url) DO UPDATE SET url = EXCLUDED.url\nRETURNING message_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "message_id",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9c8a050e29d8a64fac5efa642bda064cf2faaf3d140bdad6f7abc0d1558dffcd"
+}

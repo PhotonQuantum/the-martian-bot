@@ -1,0 +1,110 @@
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  checks: read
+  contents: write
+  packages: write
+
+name: Release
+
+jobs:
+  create_release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: taiki-e/create-gh-release-action@v1
+        with:
+          draft: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    name: Release
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Cargo Toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Cross Toolchain
+        if: matrix.cross
+        uses: taiki-e/install-action@cross
+      - uses: Swatinem/rust-cache@v2
+        name: Rust Cache
+        with:
+          shared-key: build-${{ matrix.target }}
+      - uses: taiki-e/upload-rust-binary-action@v1
+        name: Build and Upload
+        with:
+          bin: the-martian-bot
+          archive: the-martian-bot-$target
+          target: ${{ matrix.target }}
+          checksum: sha512
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  release_image_bot:
+    name: Release (bot image)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/the-martian-bot
+      - name: Build postgres image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  release_image_postgres:
+    name: Release (Postgres image)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/postgres-the-martian-bot
+      - name: Build postgres image
+        uses: docker/build-push-action@v5
+        with:
+          context: postgres
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
