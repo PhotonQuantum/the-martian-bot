@@ -16,4 +16,4 @@ WORKDIR /app
 
 COPY --from=builder /usr/local/cargo/bin/the-martian-bot /app/the-martian-bot
 
-CMD ["the-martian-bot"]
+CMD ["/app/the-martian-bot"]

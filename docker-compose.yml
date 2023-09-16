@@ -1,15 +1,17 @@
 version: "3"
 services:
   postgres:
-    image: "ghcr.io/PhotonQuantum/postgres-the-martian-bot:latest"
+    image: "ghcr.io/photonquantum/postgres-the-martian-bot:latest"
     volumes:
       - './postgresql.conf:/etc/postgresql/postgresql.conf:ro'
       - './data:/var/lib/postgresql/data'
+    environment:
+      - POSTGRES_PASSWORD=postgres
   the-martian-bot:
-    image: "ghcr.io/PhotonQuantum/the-martian-bot:latest"
+    image: "ghcr.io/photonquantum/the-martian-bot:latest"
     depends_on:
       - postgres
     environment:
-      - DATABASE_URL=postgres://the-martian-bot@postgres/the-martian-bot
+      - DATABASE_URL=postgres://the-martian-bot:postgres@postgres/the-martian-bot
     volumes:
       - './.env:/app/.env'
