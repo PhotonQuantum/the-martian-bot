@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO mute (chat_id, mute_until)\nVALUES ($1, CURRENT_TIMESTAMP + $2)\nON CONFLICT (chat_id) DO UPDATE SET mute_until = CURRENT_TIMESTAMP + $2\nRETURNING mute_until",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "mute_until",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Interval"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b24a91b4af30abfd36f88c4552d3d808aa77c00c9161f7a57bb10cf22cec7ead"
+}

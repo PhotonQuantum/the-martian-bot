@@ -27,6 +27,14 @@ pub async fn dedup(bot: BotType, msg: Message, db: PgPool) -> HandlerResult {
         { dedup_img(&bot, &msg, &db) },
     )?;
 
+    let muted = sqlx::query_file!("sql/query_muted.sql", chat_id)
+        .fetch_optional(&db)
+        .await?;
+    if muted.is_some() {
+        debug!(chat_id, message_id, "muted");
+        return Ok(());
+    }
+
     let seen_before = link.or(forward).or(img);
 
     if let Some(seen_msg_id) = seen_before {

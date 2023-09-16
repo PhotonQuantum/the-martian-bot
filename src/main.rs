@@ -16,6 +16,7 @@ mod command;
 mod dedup;
 mod ignore;
 mod msg_ext;
+mod mute;
 mod utils;
 
 // mod bot_service;

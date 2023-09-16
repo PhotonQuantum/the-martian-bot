@@ -7,10 +7,11 @@ edition = "2021"
 async-trait = "0.1"
 dotenvy = "0.15"
 dptree = "0.3"
+fundu = "2.0"
 image = "0.24"
 image_hasher = "1.2"
 once_cell = "1.18"
-sqlx = { version = "0.7", features = ["runtime-tokio", "postgres"] }
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "time"] }
 teloxide = { version = "0.12", default-features = false, features = ["rustls", "ctrlc_handler", "throttle", "cache-me", "macros"] }
 tokio = { version = "1.32", features = ["full"] }
 tracing = "0.1"
