@@ -9,6 +9,7 @@ use teloxide::Bot;
 use tracing::debug;
 
 use crate::msg_ext::MessageExt;
+use crate::utils::clean_url;
 use crate::BoxedError;
 
 pub async fn dedup_links(
@@ -18,11 +19,7 @@ pub async fn dedup_links(
     let chat_id = msg.chat.id.0;
     let message_id = msg.id.0;
 
-    let mut links = msg.links();
-    for link in &mut links {
-        // Try to remove tracking parameters
-        link.query_pairs_mut().clear();
-    }
+    let mut links: Vec<_> = msg.links().into_iter().map(clean_url).collect();
     links.sort_unstable();
     links.dedup();
 

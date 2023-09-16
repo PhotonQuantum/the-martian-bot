@@ -15,6 +15,7 @@ use dedup::{dedup_forward, dedup_img, dedup_links};
 
 mod dedup;
 mod msg_ext;
+mod utils;
 
 // mod bot_service;
 
