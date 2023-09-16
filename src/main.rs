@@ -3,17 +3,18 @@ use std::error::Error;
 
 use sqlx::PgPool;
 use teloxide::adaptors::throttle::Limits;
-use teloxide::adaptors::Throttle;
-use teloxide::dispatching::{Dispatcher, UpdateFilterExt};
-use teloxide::payloads::SendMessageSetters;
-use teloxide::requests::{Requester, RequesterExt};
-use teloxide::types::{Message, MessageId, Update};
+use teloxide::adaptors::{CacheMe, Throttle};
+use teloxide::dispatching::{Dispatcher, UpdateFilterExt, UpdateHandler};
+use teloxide::prelude::Update;
+use teloxide::requests::RequesterExt;
 use teloxide::Bot;
-use tracing::debug;
 
-use dedup::{dedup_forward, dedup_img, dedup_links};
+use crate::command::command_handler;
+use crate::dedup::dedup;
 
+mod command;
 mod dedup;
+mod ignore;
 mod msg_ext;
 mod utils;
 
@@ -21,6 +22,8 @@ mod utils;
 
 type BoxedError = Box<dyn Error + Send + Sync>;
 type HandlerResult = Result<(), BoxedError>;
+type BotType = CacheMe<Throttle<Bot>>;
+type HandlerType = UpdateHandler<BoxedError>;
 
 #[tokio::main]
 async fn main() {
@@ -33,42 +36,17 @@ async fn main() {
 
     sqlx::migrate!().run(&db).await.expect("db migrate");
 
-    let bot = Bot::from_env().throttle(Limits::default());
+    let bot = Bot::from_env().throttle(Limits::default()).cache_me();
 
-    let mut dp = Dispatcher::builder(bot.clone(), Update::filter_message().endpoint(dedup))
-        .dependencies(dptree::deps![db])
-        .enable_ctrlc_handler()
-        .build();
+    let mut dp = Dispatcher::builder(
+        bot.clone(),
+        Update::filter_message()
+            .branch(command_handler())
+            .branch(dptree::endpoint(dedup)),
+    )
+    .dependencies(dptree::deps![db])
+    .enable_ctrlc_handler()
+    .build();
 
     dp.dispatch().await;
-}
-
-async fn dedup(bot: Throttle<Bot>, msg: Message, db: PgPool) -> HandlerResult {
-    let chat_id = msg.chat.id.0;
-    let message_id = msg.id.0;
-
-    let (link, forward, img) = tokio::try_join!(
-        async {
-            let db = db.clone();
-            dedup_links(&msg, &db).await
-        },
-        async {
-            let db = db.clone();
-            dedup_forward(&msg, &db).await
-        },
-        { dedup_img(&bot, &msg, &db) },
-    )?;
-
-    let seen_before = link.or(forward).or(img);
-
-    if let Some(seen_msg_id) = seen_before {
-        debug!(chat_id, message_id, seen_msg_id, "seen before");
-        let msg_link = Message::url_of(msg.chat.id, msg.chat.username(), MessageId(seen_msg_id));
-        let body = msg_link.map_or_else(|| "看过了".to_string(), |link| format!("看过了: {link}"));
-        bot.send_message(msg.chat.id, body)
-            .reply_to_message_id(msg.id)
-            .await?;
-    }
-
-    Ok(())
 }

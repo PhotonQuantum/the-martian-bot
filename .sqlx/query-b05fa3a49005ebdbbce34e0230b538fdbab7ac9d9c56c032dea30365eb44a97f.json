@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO entities (image_phash, chat_id, message_id, ignore)\nVALUES ($1, $2, $3, $4)\nON CONFLICT (chat_id, image_phash) DO UPDATE SET ignore = $4\n",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int4",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b05fa3a49005ebdbbce34e0230b538fdbab7ac9d9c56c032dea30365eb44a97f"
+}

@@ -1,18 +1,47 @@
 #![allow(clippy::module_name_repetitions)]
 
-use image_hasher::{HashAlg, Hasher, HasherConfig};
-use once_cell::sync::Lazy;
-use sqlx::{Acquire, Postgres};
-use teloxide::adaptors::Throttle;
+use sqlx::{Acquire, PgPool, Postgres};
+use teloxide::payloads::SendMessageSetters;
 use teloxide::prelude::Message;
-use teloxide::Bot;
+use teloxide::requests::Requester;
+use teloxide::types::MessageId;
 use tracing::debug;
 
 use crate::msg_ext::MessageExt;
-use crate::utils::clean_url;
-use crate::BoxedError;
+use crate::utils::{clean_url, hash_img};
+use crate::{BotType, BoxedError, HandlerResult};
 
-pub async fn dedup_links(
+pub async fn dedup(bot: BotType, msg: Message, db: PgPool) -> HandlerResult {
+    let chat_id = msg.chat.id.0;
+    let message_id = msg.id.0;
+
+    let (link, forward, img) = tokio::try_join!(
+        async {
+            let db = db.clone();
+            dedup_links(&msg, &db).await
+        },
+        async {
+            let db = db.clone();
+            dedup_forward(&msg, &db).await
+        },
+        { dedup_img(&bot, &msg, &db) },
+    )?;
+
+    let seen_before = link.or(forward).or(img);
+
+    if let Some(seen_msg_id) = seen_before {
+        debug!(chat_id, message_id, seen_msg_id, "seen before");
+        let msg_link = Message::url_of(msg.chat.id, msg.chat.username(), MessageId(seen_msg_id));
+        let body = msg_link.map_or_else(|| "看过了".to_string(), |link| format!("看过了: {link}"));
+        bot.send_message(msg.chat.id, body)
+            .reply_to_message_id(msg.id)
+            .await?;
+    }
+
+    Ok(())
+}
+
+async fn dedup_links(
     msg: &Message,
     db: impl Acquire<'_, Database = Postgres> + Send,
 ) -> Result<Option<i32>, BoxedError> {
@@ -34,7 +63,7 @@ pub async fn dedup_links(
         let record = sqlx::query_file!("sql/insert_url.sql", link.to_string(), chat_id, message_id)
             .fetch_one(&mut *txn)
             .await?;
-        if record.message_id != message_id {
+        if !record.ignore && record.message_id != message_id {
             seen_before.get_or_insert(record.message_id);
         }
     }
@@ -42,7 +71,7 @@ pub async fn dedup_links(
     Ok(seen_before)
 }
 
-pub async fn dedup_forward(
+async fn dedup_forward(
     msg: &Message,
     db: impl Acquire<'_, Database = Postgres> + Send,
 ) -> Result<Option<i32>, BoxedError> {
@@ -67,7 +96,7 @@ pub async fn dedup_forward(
         )
         .fetch_one(&mut *conn)
         .await?;
-        if record.message_id != message_id {
+        if !record.ignore && record.message_id != message_id {
             return Ok(Some(record.message_id));
         }
     }
@@ -75,29 +104,16 @@ pub async fn dedup_forward(
     Ok(None)
 }
 
-pub async fn dedup_img(
-    bot: &Throttle<Bot>,
+async fn dedup_img(
+    bot: &BotType,
     msg: &Message,
     db: impl Acquire<'_, Database = Postgres> + Send,
 ) -> Result<Option<i32>, BoxedError> {
-    static IMG_HASHER: Lazy<Hasher> = Lazy::new(|| {
-        HasherConfig::new()
-            .hash_alg(HashAlg::DoubleGradient)
-            .preproc_dct()
-            .to_hasher()
-    });
-
     let chat_id = msg.chat.id.0;
     let message_id = msg.id.0;
 
     if let Some(photo) = msg.image(bot).await? {
-        let hash = {
-            let img_hash =
-                tokio::task::spawn_blocking(move || IMG_HASHER.hash_image(&photo)).await?;
-            let mut buf = [0u8; 8];
-            buf[..5].copy_from_slice(img_hash.as_bytes());
-            i64::from_be_bytes(buf)
-        };
+        let hash = tokio::task::spawn_blocking(move || hash_img(&photo)).await?;
         debug!(chat_id, message_id, hash, "image found");
 
         let mut conn = db.acquire().await?;
@@ -105,15 +121,17 @@ pub async fn dedup_img(
             .fetch_optional(&mut *conn)
             .await?;
 
-        if let Some(record) = &record {
-            return Ok(Some(record.message_id));
-        }
-
-        if record.map_or(true, |record| record.dist != 0) {
+        if record.as_ref().map_or(true, |record| record.dist != 0) {
             // A different image, need to insert the entity
             sqlx::query_file!("sql/insert_img.sql", hash, chat_id, message_id)
                 .execute(&mut *conn)
                 .await?;
+        }
+
+        if let Some(record) = &record {
+            if !record.ignore {
+                return Ok(Some(record.message_id));
+            }
         }
     }
 

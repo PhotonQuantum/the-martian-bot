@@ -2,20 +2,20 @@ use std::error::Error;
 
 use async_trait::async_trait;
 use image::DynamicImage;
-use teloxide::adaptors::Throttle;
 use teloxide::net::Download;
 use teloxide::prelude::{Message, Requester};
 use teloxide::types::MessageEntityKind;
-use teloxide::Bot;
 use tracing::warn;
 use url::Url;
+
+use crate::BotType;
 
 #[async_trait]
 pub trait MessageExt {
     fn links(&self) -> Vec<Url>;
     async fn image(
         &self,
-        bot: &Throttle<Bot>,
+        bot: &BotType,
     ) -> Result<Option<DynamicImage>, Box<dyn Error + Send + Sync>>;
 }
 
@@ -41,7 +41,7 @@ impl MessageExt for Message {
     }
     async fn image(
         &self,
-        bot: &Throttle<Bot>,
+        bot: &BotType,
     ) -> Result<Option<DynamicImage>, Box<dyn Error + Send + Sync>> {
         Ok(
             match self.photo().and_then(|photos| {

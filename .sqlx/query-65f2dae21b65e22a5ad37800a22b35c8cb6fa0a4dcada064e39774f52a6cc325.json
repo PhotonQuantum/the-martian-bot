@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT message_id, image_phash <-> $1 AS \"dist!\"\nFROM entities\nWHERE chat_id = $2\n  AND image_phash <@ ($1, 6)\nORDER BY \"dist!\"\nLIMIT 1\n",
+  "query": "SELECT message_id, image_phash <-> $1 AS \"dist!\", ignore\nFROM entities\nWHERE chat_id = $2\n  AND image_phash <@ ($1, 6)\nORDER BY \"dist!\"\nLIMIT 1\n",
   "describe": {
     "columns": [
       {
@@ -12,6 +12,11 @@
         "ordinal": 1,
         "name": "dist!",
         "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "ignore",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -22,8 +27,9 @@
     },
     "nullable": [
       false,
-      null
+      null,
+      false
     ]
   },
-  "hash": "ea0bcf85511c386561a833618b339dfd8ca4b945045d54bb9c47302d8492f194"
+  "hash": "65f2dae21b65e22a5ad37800a22b35c8cb6fa0a4dcada064e39774f52a6cc325"
 }
