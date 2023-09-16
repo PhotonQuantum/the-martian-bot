@@ -3,6 +3,7 @@
 use image_hasher::{HashAlg, Hasher, HasherConfig};
 use once_cell::sync::Lazy;
 use sqlx::{Acquire, Postgres};
+use teloxide::adaptors::Throttle;
 use teloxide::prelude::Message;
 use teloxide::Bot;
 use tracing::debug;
@@ -78,7 +79,7 @@ pub async fn dedup_forward(
 }
 
 pub async fn dedup_img(
-    bot: &Bot,
+    bot: &Throttle<Bot>,
     msg: &Message,
     db: impl Acquire<'_, Database = Postgres> + Send,
 ) -> Result<Option<i32>, BoxedError> {

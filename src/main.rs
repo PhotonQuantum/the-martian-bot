@@ -3,6 +3,7 @@ use std::error::Error;
 
 use sqlx::PgPool;
 use teloxide::adaptors::throttle::Limits;
+use teloxide::adaptors::Throttle;
 use teloxide::dispatching::{Dispatcher, UpdateFilterExt};
 use teloxide::payloads::SendMessageSetters;
 use teloxide::requests::{Requester, RequesterExt};
@@ -41,7 +42,7 @@ async fn main() {
     dp.dispatch().await;
 }
 
-async fn dedup(bot: Bot, msg: Message, db: PgPool) -> HandlerResult {
+async fn dedup(bot: Throttle<Bot>, msg: Message, db: PgPool) -> HandlerResult {
     let chat_id = msg.chat.id.0;
     let message_id = msg.id.0;
 
