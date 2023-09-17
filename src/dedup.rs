@@ -9,15 +9,14 @@ use tracing::debug;
 
 use crate::msg_ext::MessageExt;
 use crate::utils::{clean_url, hash_img};
-use crate::whitelist::{whitelist_msg, whitelist_url};
 use crate::{BotType, BoxedError, HandlerResult};
 
+struct Duplicate {
+    pub msg_id: i32,
+    pub duplicate_cnt: i32,
+}
+
 pub async fn dedup(bot: BotType, msg: Message, db: PgPool) -> HandlerResult {
-    if let Some(txt) = msg.text() {
-        if whitelist_msg(txt) {
-            return Ok(());
-        }
-    }
     let chat_id = msg.chat.id.0;
     let message_id = msg.id.0;
 
@@ -43,17 +42,23 @@ pub async fn dedup(bot: BotType, msg: Message, db: PgPool) -> HandlerResult {
 
     let seen_before = link.or(forward).or(img);
 
-    if let Some((seen_msg_id, dup_cnt)) = seen_before {
-        debug!(chat_id, message_id, seen_msg_id, "seen before");
-        let msg_link = Message::url_of(msg.chat.id, msg.chat.username(), MessageId(seen_msg_id));
-        let body = msg_link.map_or_else(
-            || make_reply_msg(dup_cnt),
-            |link| make_reply_msg_with_link(dup_cnt, link),
-        );
-        bot.send_message(msg.chat.id, body)
-            .reply_to_message_id(msg.id)
-            .await?;
-    }
+    let Some(Duplicate {
+        msg_id: seen_msg_id,
+        duplicate_cnt: dup_cnt,
+    }) = seen_before
+    else {
+        return Ok(());
+    };
+
+    debug!(chat_id, message_id, seen_msg_id, "seen before");
+    let msg_link = Message::url_of(msg.chat.id, msg.chat.username(), MessageId(seen_msg_id));
+    let body = msg_link.map_or_else(
+        || make_reply_msg(dup_cnt),
+        |link| make_reply_msg_with_link(dup_cnt, link),
+    );
+    bot.send_message(msg.chat.id, body)
+        .reply_to_message_id(msg.id)
+        .await?;
 
     Ok(())
 }
@@ -61,7 +66,7 @@ pub async fn dedup(bot: BotType, msg: Message, db: PgPool) -> HandlerResult {
 async fn dedup_links(
     msg: &Message,
     db: impl Acquire<'_, Database = Postgres> + Send,
-) -> Result<Option<(i32, i32)>, BoxedError> {
+) -> Result<Option<Duplicate>, BoxedError> {
     let chat_id = msg.chat.id.0;
     let message_id = msg.id.0;
 
@@ -73,10 +78,6 @@ async fn dedup_links(
         return Ok(None);
     }
 
-    if links.iter().all(whitelist_url) {
-        return Ok(None);
-    }
-
     let mut txn = db.begin().await?;
     let mut seen_before = None;
     for link in links {
@@ -85,7 +86,11 @@ async fn dedup_links(
             .fetch_one(&mut *txn)
             .await?;
         if !record.ignore && record.message_id != message_id {
-            seen_before.get_or_insert((record.message_id, record.duplicate_cnt));
+            let dup = Duplicate {
+                msg_id: record.message_id,
+                duplicate_cnt: record.duplicate_cnt,
+            };
+            seen_before.get_or_insert(dup);
         }
     }
     txn.commit().await?;
@@ -95,7 +100,7 @@ async fn dedup_links(
 async fn dedup_forward(
     msg: &Message,
     db: impl Acquire<'_, Database = Postgres> + Send,
-) -> Result<Option<(i32, i32)>, BoxedError> {
+) -> Result<Option<Duplicate>, BoxedError> {
     let chat_id = msg.chat.id.0;
     let message_id = msg.id.0;
 
@@ -118,7 +123,11 @@ async fn dedup_forward(
         .fetch_one(&mut *conn)
         .await?;
         if !record.ignore && record.message_id != message_id {
-            return Ok(Some((record.message_id, record.duplicate_cnt)));
+            let dup = Duplicate {
+                msg_id: record.message_id,
+                duplicate_cnt: record.duplicate_cnt,
+            };
+            return Ok(Some(dup));
         }
     }
 
@@ -129,7 +138,7 @@ async fn dedup_img(
     bot: &BotType,
     msg: &Message,
     db: impl Acquire<'_, Database = Postgres> + Send,
-) -> Result<Option<(i32, i32)>, BoxedError> {
+) -> Result<Option<Duplicate>, BoxedError> {
     let chat_id = msg.chat.id.0;
     let message_id = msg.id.0;
 
@@ -147,7 +156,11 @@ async fn dedup_img(
 
     if let Some(record) = &record {
         if !record.ignore {
-            return Ok(Some((record.message_id, record.duplicate_cnt)));
+            let dup = Duplicate {
+                msg_id: record.message_id,
+                duplicate_cnt: record.duplicate_cnt,
+            };
+            return Ok(Some(dup));
         }
     }
 
@@ -161,17 +174,18 @@ async fn dedup_img(
     Ok(None)
 }
 
-fn make_reply_msg(seen_times: i32) -> String {
-    if seen_times == 1 {
-        "看过了!".to_string()
-    } else if (..=5).contains(&seen_times) {
-        format!("看过 {} 次啦！", seen_times)
-    } else {
-        format!("看过 {} 次啦！不要再发啦！", seen_times)
+fn make_reply(seen_times: i32) -> String {
+    match seen_times {
+        0 => unreachable!("seen_times should not be 0"),
+        1..=2 => "看过了!".to_string(),
+        3..=5 => format!("看过 {} 次啦！", seen_times),
+        _ => format!("看过 {} 次啦！不要再发啦！", seen_times),
     }
 }
 
-fn make_reply_msg_with_link(seem_times: i32, link: impl ToString) -> String {
-    let msg = make_reply_msg(seem_times);
-    format!("{}:{}", msg.trim_end_matches('!'), link.to_string())
+fn make_reply_msg(times: i32) -> String {
+    format!("{}!", make_reply(times))
+}
+fn make_reply_msg_with_link(seen_times: i32, link: impl ToString) -> String {
+    format!("{}: {}", make_reply(seen_times), link.to_string())
 }
