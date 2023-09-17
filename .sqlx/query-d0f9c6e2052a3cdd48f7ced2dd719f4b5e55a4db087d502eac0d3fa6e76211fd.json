@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO entities (url, chat_id, message_id)\nVALUES ($1, $2, $3)\nON CONFLICT (chat_id, url) DO UPDATE SET url = EXCLUDED.url, duplicate_cnt = entities.duplicate_cnt + 1\nRETURNING message_id, ignore, duplicate_cnt\n",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "message_id",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "ignore",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 2,
+        "name": "duplicate_cnt",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d0f9c6e2052a3cdd48f7ced2dd719f4b5e55a4db087d502eac0d3fa6e76211fd"
+}

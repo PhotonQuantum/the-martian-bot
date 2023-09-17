@@ -18,6 +18,7 @@ mod ignore;
 mod msg_ext;
 mod mute;
 mod utils;
+mod whitelist;
 
 // mod bot_service;
 
