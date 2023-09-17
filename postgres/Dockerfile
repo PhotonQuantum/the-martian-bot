@@ -20,8 +20,6 @@ RUN cd /usr/src/pg-spgist_hamming/bktree \
 
 FROM postgres:15-alpine
 
-COPY ./postgresql.conf /etc/postgresql/postgresql.conf
-
 COPY --from=pg_builder /usr/local/lib/postgresql/bktree.so /usr/local/lib/postgresql/
 
 COPY --from=pg_builder /usr/local/share/postgresql/extension/bktree* /usr/local/share/postgresql/extension/
