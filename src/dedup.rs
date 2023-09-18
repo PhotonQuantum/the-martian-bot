@@ -177,9 +177,9 @@ async fn dedup_img(
 fn make_reply(seen_times: i32) -> String {
     match seen_times {
         0 => unreachable!("seen_times should not be 0"),
-        1..=2 => "看过了!".to_string(),
-        3..=5 => format!("看过 {} 次啦！", seen_times),
-        _ => format!("看过 {} 次啦！不要再发啦！", seen_times),
+        1..=2 => "看过了".to_string(),
+        3..=5 => format!("看过 {} 次啦", seen_times),
+        _ => format!("看过 {} 次啦！不要再发啦", seen_times),
     }
 }
 
