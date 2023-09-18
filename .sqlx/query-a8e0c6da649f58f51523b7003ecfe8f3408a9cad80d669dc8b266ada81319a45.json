@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT message_id, image_phash <-> $1 AS \"dist!\", ignore\nFROM entities\nWHERE chat_id = $2\n  AND image_phash <@ ($1, 6)\nORDER BY \"dist!\"\nLIMIT 1\n",
+  "query": "SELECT message_id, image_phash <-> $1 AS \"dist!\", ignore\nFROM entities\nWHERE chat_id = $2\n  AND image_phash <@ ($1, 3)\nORDER BY \"dist!\"\nLIMIT 1\n",
   "describe": {
     "columns": [
       {
@@ -31,5 +31,5 @@
       false
     ]
   },
-  "hash": "65f2dae21b65e22a5ad37800a22b35c8cb6fa0a4dcada064e39774f52a6cc325"
+  "hash": "a8e0c6da649f58f51523b7003ecfe8f3408a9cad80d669dc8b266ada81319a45"
 }
