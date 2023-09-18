@@ -154,6 +154,13 @@ async fn dedup_img(
         .fetch_optional(&mut *conn)
         .await?;
 
+    if record.as_ref().map_or(true, |record| record.dist != 0) {
+        // A different image, need to insert the entity
+        sqlx::query_file!("sql/insert_img.sql", hash, chat_id, message_id)
+            .execute(&mut *conn)
+            .await?;
+    }
+
     if let Some(record) = &record {
         if !record.ignore {
             let dup = Duplicate {
@@ -162,13 +169,6 @@ async fn dedup_img(
             };
             return Ok(Some(dup));
         }
-    }
-
-    if record.map_or(true, |record| record.dist != 0) {
-        // A different image, need to insert the entity
-        sqlx::query_file!("sql/insert_img.sql", hash, chat_id, message_id)
-            .execute(&mut *conn)
-            .await?;
     }
 
     Ok(None)
