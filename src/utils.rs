@@ -10,7 +10,7 @@ static IMG_HASHER: Lazy<Hasher> = Lazy::new(|| {
 });
 
 pub fn clean_url(mut url: Url) -> Url {
-    const WHITELIST: &[(&str, &[&str])] = &[("youtube.com", &["v"])];
+    const WHITELIST: &[(&str, &[&str])] = &[("youtube.com", &["v"]), ("www.youtube.com", &["v"])];
 
     if url.query().is_none() {
         return url;
