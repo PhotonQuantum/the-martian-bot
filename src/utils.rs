@@ -19,6 +19,10 @@ pub fn clean_url(mut url: Url) -> Url {
         ),
     ];
 
+    if url.scheme() == "http" {
+        url.set_scheme("https").expect("can change http to https");
+    }
+
     if url.query().is_none() {
         return url;
     }
@@ -52,4 +56,14 @@ pub fn hash_img(photo: &impl Image) -> i64 {
     let mut buf = [0u8; 8];
     buf[..5].copy_from_slice(img_hash.as_bytes());
     i64::from_be_bytes(buf)
+}
+
+pub fn parse_url(url: &str) -> Result<Url, url::ParseError> {
+    Url::parse(url).or_else(|e| {
+        if e == url::ParseError::RelativeUrlWithoutBase {
+            Url::parse(&format!("https://{url}"))
+        } else {
+            Err(e)
+        }
+    })
 }

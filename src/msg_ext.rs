@@ -8,6 +8,7 @@ use teloxide::types::MessageEntityKind;
 use tracing::warn;
 use url::Url;
 
+use crate::utils::parse_url;
 use crate::BotType;
 
 #[async_trait]
@@ -26,7 +27,7 @@ impl MessageExt for Message {
             entities
                 .iter()
                 .filter_map(|entity| match entity.kind() {
-                    MessageEntityKind::Url => Url::parse(entity.text()).map_or_else(
+                    MessageEntityKind::Url => parse_url(entity.text()).map_or_else(
                         |_| {
                             warn!(url=%entity.text(), "invalid url");
                             None
