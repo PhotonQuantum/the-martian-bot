@@ -15,6 +15,11 @@ pub async fn unignore(bot: BotType, msg: Message, db: PgPool) -> HandlerResult {
     ignore_(bot, msg, false, db).await
 }
 
+#[allow(clippy::unused_async)]
+pub async fn nop() -> HandlerResult {
+    Ok(())
+}
+
 async fn ignore_(bot: BotType, msg: Message, ignore: bool, db: PgPool) -> HandlerResult {
     let respond = if let Some(target) = msg.reply_to_message() {
         let (link, forward, img) = tokio::try_join!(
